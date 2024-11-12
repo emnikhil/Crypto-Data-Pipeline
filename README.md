@@ -2,58 +2,41 @@
 
 ## Project Overview
 
-This project implements an end-to-end data pipeline that extracts cryptocurrency data from a public API, processes it using Databricks, and stores the cleaned data in Google BigQuery. The pipeline is orchestrated using Apache Airflow (via Google Cloud Composer) to run daily, ensuring that the most recent data is available for analysis.
+This project implements an end-to-end data pipeline that extracts cryptocurrency data from a public API, processes it, and stores the data in Google BigQuery for analysis. The pipeline is orchestrated using Apache Airflow (via Google Cloud Composer) to run daily, ensuring that the most recent data is available for visualization and reporting.
 
 ![Data Pipeline Diagram](/images/crypto-drawio.png)
 
 ## Technologies Used
 
 - **Google Cloud Platform (GCP)**
-  - **Google Cloud Storage (GCS)**: Used for storing raw cryptocurrency data extracted from the API.
-  - **Google BigQuery**: Used for storing processed data and performing queries for analysis.
-  - **Cloud Composer (Apache Airflow)**: Used for orchestrating and scheduling the entire data pipeline.
-
-- **Databricks**
-  - **Scala**: Used for data processing, including data cleaning, transformation, and other ETL tasks.
+  - **Google Cloud Storage (GCS)**: Used for storing raw cryptocurrency data extracted from the API. The data is organized in folders by date.
+  - **Google BigQuery**: Used for storing processed data and running procedures for analysis.
+  - **Cloud Composer (Apache Airflow)**: Used for orchestrating and scheduling the entire data pipeline, ensuring data is processed and updated daily.
 
 - **GitHub**: Used for version control to manage project code and documentation.
 
 ## Pipeline Steps
 
 1. **Data Extraction**:
-   - **Trigger Airflow DAG**: A Directed Acyclic Graph (DAG) is triggered in Airflow to initiate the data extraction process.
-   - **API Call**: The DAG makes an API call to retrieve the latest cryptocurrency data for the specified coins (e.g., Bitcoin, Ethereum, etc.).
-   - **Store Raw Data**: The raw data is stored in Google Cloud Storage (GCS) as JSON or CSV files for further processing.
+   - **Trigger Airflow DAG**: A Directed Acyclic Graph (DAG) is triggered in Airflow to start the data extraction process.
+   - **API Call**: The DAG makes an API call to retrieve the latest cryptocurrency data for specified coins (e.g., Bitcoin, Ethereum).
+   - **Store Raw Data**: The raw data is stored in Google Cloud Storage (GCS) in CSV format, with each file saved in a date-stamped folder (e.g., `crypto_data/YYYY-MM-DD/crypto_data_<timestamp>.csv`).
 
-2. **Data Processing**:
-   - **Databricks Integration**: Databricks is set up to access the raw data stored in GCS.
-   - **Data Cleaning**: Using Scala, the raw data is cleaned by handling missing values, removing duplicates, and standardizing formats.
-   - **Data Transformation**: Additional transformations are applied to make the data analysis-ready (e.g., aggregating, filtering, or restructuring data).
-   - **Write Processed Data**: The cleaned and transformed data is written back to Google Cloud Storage or directly to Google BigQuery for analysis.
+2. **Data Load to BigQuery**:
+   - **BigQuery Load**: After a brief waiting period, a BigQuery load job is triggered to append the CSV data from GCS into an existing BigQuery table. The table structure remains consistent, with only new data appended daily.
+   - **Procedure Execution**: After the data is loaded, a BigQuery stored procedure is executed to perform any necessary transformations and calculations, generating output in a final BigQuery table ready for visualization.
 
-3. **Data Storage**:
-   - **BigQuery Storage**: The processed data is loaded into Google BigQuery, where it can be queried efficiently.
-   - **Data Structure**: Define a suitable schema for the BigQuery tables to facilitate efficient querying and reporting.
+3. **Data Visualization**:
+   - **Google Data Studio**: Connect Google Data Studio to the final BigQuery table to create visualizations and dashboards displaying cryptocurrency trends and metrics.
+   - **Report Creation**: Build interactive reports for stakeholders or further analysis.
 
-4. **Data Visualization**:
-   - **Google Data Studio**: Connect Google Data Studio to BigQuery to create visualizations and dashboards that display key metrics and insights from the cryptocurrency data.
-   - **Report Creation**: Build interactive reports that can be shared with stakeholders or used for further analysis.
-
-5. **Scheduling and Monitoring**:
+4. **Scheduling and Monitoring**:
    - **Daily Runs**: The Airflow DAG is configured to run daily, ensuring that the pipeline continually ingests the latest cryptocurrency data.
-   - **Monitoring**: Set up alerts and logs to monitor the execution of the pipeline and ensure data integrity.
+   - **Monitoring**: Set up alerts and logs in Airflow to monitor the pipeline’s execution and ensure data accuracy.
 
 ## Getting Started
 
 ### Prerequisites
 
 - A Google Cloud Platform account
-- A Databricks account
 - Git installed on your local machine
-
-### Steps to Set Up
-
-1. **Clone the Repository**:
-   ```bash
-   git clone https://github.com/emnikhil/Crypto-Data-Pipeline/crypto-data-pipeline.git
-   cd crypto-data-pipeline
