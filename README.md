@@ -4,7 +4,7 @@
 
 This project implements an end-to-end data pipeline that extracts cryptocurrency data from a public API, processes it, and stores the data in Google BigQuery for analysis. The pipeline is orchestrated using Apache Airflow (via Google Cloud Composer) to run daily, ensuring that the most recent data is available for visualization and reporting.
 
-![Data Pipeline Diagram](/images/crypto-drawio.png)
+![Data Pipeline Diagram](/images/crypto.png)
 
 ## Technologies Used
 
