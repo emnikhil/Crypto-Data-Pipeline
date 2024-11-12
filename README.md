@@ -13,6 +13,7 @@ This project implements an end-to-end data pipeline that extracts cryptocurrency
   - **Google BigQuery**: Used for storing processed data and running procedures for analysis.
   - **Cloud Composer (Apache Airflow)**: Used for orchestrating and scheduling the entire data pipeline, ensuring data is processed and updated daily.
 
+- **Google Looker**: Used to visualize and analyze the data stored in BigQuery by creating interactive dashboards, reports, and charts.
 - **GitHub**: Used for version control to manage project code and documentation.
 
 ## Pipeline Steps
@@ -27,8 +28,8 @@ This project implements an end-to-end data pipeline that extracts cryptocurrency
    - **Procedure Execution**: After the data is loaded, a BigQuery stored procedure is executed to perform any necessary transformations and calculations, generating output in a final BigQuery table ready for visualization.
 
 3. **Data Visualization**:
-   - **Google Data Studio**: Connect Google Data Studio to the final BigQuery table to create visualizations and dashboards displaying cryptocurrency trends and metrics.
-   - **Report Creation**: Build interactive reports for stakeholders or further analysis.
+   - **Google Looker**: Connect Looker to the final BigQuery table to create visualizations and dashboards displaying cryptocurrency trends and metrics.
+   - **Report Creation**: Use Looker’s tools to build interactive, customizable reports for stakeholders or further analysis, with options to define custom metrics and alerts as needed.
 
 4. **Scheduling and Monitoring**:
    - **Daily Runs**: The Airflow DAG is configured to run daily, ensuring that the pipeline continually ingests the latest cryptocurrency data.
