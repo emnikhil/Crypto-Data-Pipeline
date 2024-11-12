@@ -1,6 +1,10 @@
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
 
+from google.cloud import bigquery
+from google.api_core.exceptions import GoogleAPIError
+import logging
+
 from datetime import datetime, timedelta
 
 import time
@@ -9,6 +13,7 @@ import pandas as pd
 
 from google.cloud import storage
 
+#Function to Fetch data and write on google cloud storage
 def fetch_and_upload_crypto_data():
     url = 'https://api.coingecko.com/api/v3/simple/price'
     
@@ -70,6 +75,7 @@ def fetch_and_upload_crypto_data():
         
         except requests.exceptions.RequestException as e:
             print(f"Error fetching data for {coin}: {e}")
+
         except Exception as e:
             print(f"Error processing {coin}: {e}")
         
@@ -81,7 +87,7 @@ def fetch_and_upload_crypto_data():
         # Convert all collected data to a DataFrame
         df = pd.DataFrame(all_data)  # Use DataFrame directly from the cleaned list
         
-        # Get current timestamp for filename
+        # Get current date and timestamp for filename
         current_time = datetime.now().strftime("%Y%m%d%H%M%S")
         current_date = datetime.now().strftime("%Y-%m-%d")
         local_file_path = f'/tmp/crypto_data_{current_time}.csv'
@@ -96,8 +102,85 @@ def fetch_and_upload_crypto_data():
         blob.upload_from_filename(local_file_path)
         
         print("Data uploaded to GCS successfully.")
+        
     else:
         print("No data collected. No file uploaded.")
+
+#Function to load data on BigQuery
+def load_data_to_bigquery():
+
+    # Set up logging
+    logging.basicConfig(level=logging.INFO)
+
+    client = bigquery.Client()
+
+    # Define your BigQuery table ID
+    table_id = 'crypto-data-analysis-441505.initial_data.crypto_data_temp'
+
+    # Set up job configuration to append data and create table if needed
+    job_config = bigquery.LoadJobConfig(
+        source_format = bigquery.SourceFormat.CSV,
+        skip_leading_rows = 1,
+        autodetect = True,  # Automatically detects the schema
+        write_disposition = bigquery.WriteDisposition.WRITE_APPEND,  # Append data to the existing table
+        create_disposition = bigquery.CreateDisposition.CREATE_IF_NEEDED,  # Create the table if it doesn't exist
+        schema_update_options = ['ALLOW_FIELD_ADDITION']  # Allow new fields to be added to the schema
+    )
+
+    # Define the URI for your source CSV files
+    # Get current date
+    current_date = datetime.now().strftime("%Y-%m-%d")
+    uri = f'gs://initial_layer/crypto_data/{current_date}/crypto_data_*.csv'
+
+    try:
+        # Create a load job to load the data from GCS to BigQuery
+        load_job = client.load_table_from_uri(uri, table_id, job_config=job_config)
+
+        # Wait for the job to complete
+        load_job.result()
+
+        # Check if the load job was successful
+        if load_job.state == 'DONE' and load_job.error_result is None:
+            logging.info(f"Data appended to BigQuery table {table_id}.")
+        else:
+            # Log detailed error message if the load job fails
+            logging.error(f"Failed to load data to BigQuery table {table_id}.")
+            logging.error(load_job.errors)
+
+    except GoogleAPIError as e:
+        # Handle Google API errors, such as network issues or permission problems
+        logging.error(f"Google Cloud API error occurred: {e}")
+
+    except Exception as e:
+        # Handle other unexpected errors
+        logging.error(f"An error occurred: {e}")
+    
+     # Wait for 10 seconds before making the next request
+    time.sleep(10)
+
+# Function to trigger BigQuery procedure
+def trigger_bigquery_procedure():
+    client = bigquery.Client()
+
+    # Specify the SQL procedure to execute
+    query = "CALL `crypto-data-analysis-441505.initial_data.sp_crypto_analysis`();"
+    
+    try:
+        # Execute the query (stored procedure)
+        query_job = client.query(query)
+
+        # Wait for the job to complete
+        query_job.result()
+
+        print("BigQuery procedure executed successfully.")
+
+    except GoogleAPIError as e:
+        # Handle API errors
+        print(f"Google Cloud API error occurred: {e}")
+
+    except Exception as e:
+        # Handle other exceptions
+        print(f"An error occurred: {e}")
 
 # Function to log start time
 def log_start_time():
@@ -138,10 +221,17 @@ with DAG(
         python_callable = fetch_and_upload_crypto_data,
     )
 
-    # databricks_task = PythonOperator(
-    #     task_id = 'trigger_databricks_job',
-    #     python_callable = trigger_databricks_job,
-    # )
+    # Load data to BigQuery task
+    load_data_task = PythonOperator(
+        task_id='load_to_bigquery',
+        python_callable=load_data_to_bigquery,
+    )
+
+    # Trigger BigQuery procedure task
+    trigger_procedure_task = PythonOperator(
+        task_id='trigger_bigquery_procedure',
+        python_callable=trigger_bigquery_procedure,
+    )
 
     # End task to print timestamp
     end = PythonOperator(
@@ -150,5 +240,4 @@ with DAG(
     )
 
     # Task dependencies
-    # start >> fetch_and_upload_data_task >> databricks_task >> end
-    start >> fetch_and_upload_data_task >> end
+    start >> fetch_and_upload_data_task >> load_data_task  >> trigger_procedure_task >> end
