@@ -16,9 +16,12 @@ from google.cloud import storage
 #Function to Fetch data and write on google cloud storage
 def fetch_and_upload_crypto_data():
     url = 'https://api.coingecko.com/api/v3/simple/price'
+
+    # Get current date for filename
+    current_date = datetime.now().strftime("%Y-%m-%d")
     
     # List of coins you want to fetch
-    coins = coins = ['bitcoin', 'ethereum', 'tether', 'binancecoin', 'solana', 'usd-coin', 'ripple', 'dogecoin', 'shiba-inu', 'cardano']
+    coins = ['bitcoin', 'ethereum', 'tether', 'binancecoin', 'solana']
     
     # Initialize an empty list to collect all coin data
     all_data = []
@@ -65,18 +68,19 @@ def fetch_and_upload_crypto_data():
                     'eur_24h_vol': coin_data.get('eur_24h_vol', None),
                     'eur_24h_change': coin_data.get('eur_24h_change', None),
                     'eur_last_updated': coin_data.get('last_updated_at', None),
+                    'date': current_date,
                 }
                 
                 all_data.append(flattened_data)  # Append the cleaned data for this coin
-                print(f"Data for {coin_data['coin']} appended to DataFrame.")
+                print(f"Data for {coin} appended to DataFrame.")
             else:
-                print(f"Data for {coin_data['coin']} not found in the response.")
+                print(f"Data for {coin} not found in the response.")
         
         except requests.exceptions.RequestException as e:
-            print(f"Error fetching data for {coin_data['coin']}: {e}")
+            print(f"Error fetching data for {coin}: {e}")
 
         except Exception as e:
-            print(f"Error processing {coin_data['coin']}: {e}")
+            print(f"Error processing {coin}: {e}")
         
         # Wait for 30 seconds before making the next request
         time.sleep(30)
@@ -86,10 +90,7 @@ def fetch_and_upload_crypto_data():
         # Convert all collected data to a DataFrame
         df = pd.DataFrame(all_data)  # Use DataFrame directly from the cleaned list
         
-        # Get current date and timestamp for filename
-        current_time = datetime.now().strftime("%Y%m%d%H%M%S")
-        current_date = datetime.now().strftime("%Y-%m-%d")
-        local_file_path = f'/tmp/crypto_data_{current_time}.csv'
+        local_file_path = f'/tmp/crypto_data_{current_date}.csv'
         
         # Save the DataFrame as a csv file
         df.to_csv(local_file_path, index=False)
@@ -97,7 +98,7 @@ def fetch_and_upload_crypto_data():
         # Initialize GCS client and upload the file
         client = storage.Client()
         bucket = client.get_bucket('initial_layer')
-        blob = bucket.blob(f'crypto_data/{current_date}/crypto_data_{current_time}.csv')
+        blob = bucket.blob(f'crypto_data/{current_date}/crypto_data_{current_date}.csv')
         blob.upload_from_filename(local_file_path)
         
         print("Data uploaded to GCS successfully.")
@@ -123,7 +124,11 @@ def load_data_to_bigquery():
         autodetect = True,  # Automatically detects the schema
         write_disposition = bigquery.WriteDisposition.WRITE_APPEND,  # Append data to the existing table
         create_disposition = bigquery.CreateDisposition.CREATE_IF_NEEDED,  # Create the table if it doesn't exist
-        schema_update_options = ['ALLOW_FIELD_ADDITION']  # Allow new fields to be added to the schema
+        schema_update_options = ['ALLOW_FIELD_ADDITION'],  # Allow new fields to be added to the schema
+        time_partitioning = bigquery.table.TimePartitioning(
+            field = "date",  # Partition Column Name
+            type_ = bigquery.TimePartitioningType.DAY  # Partition by day
+        )
     )
 
     # Define the URI for source CSV files
@@ -154,7 +159,7 @@ def load_data_to_bigquery():
         # Handle other unexpected errors
         logging.error(f"An error occurred: {e}")
     
-     # Wait for 10 seconds before making the next request
+    # Wait for 10 seconds before making the next request
     time.sleep(10)
 
 # Function to trigger BigQuery procedure
@@ -162,7 +167,7 @@ def trigger_bigquery_procedure():
 
     client = bigquery.Client()
 
-    query = "CALL `crypto-data-analysis-441505.initial_data.sp_crypto_analysis`();"
+    query = "CALL `crypto-data-analysis-441505.source_codes.sp_crypto_analysis`();"
     
     try:
         # Execute the query (stored procedure)
@@ -205,8 +210,7 @@ with DAG(
     'crypto_data_pipeline',
     default_args = default_args,
     description = 'A DAG to fetch crypto data, store on GCS, and process in Databricks',
-    schedule_interval = '0 3 * * *',  # Run daily at 3:30 AM UTC / 9:00 AM IST
-    timezone = 'Asia/Kolkata'  # Optional: specify the timezone as IST
+    schedule_interval = '0 3 * * *'  # Run daily at 3:30 AM UTC / 9:00 AM IST
 ) as dag:
 
     # Start task to print timestamp
@@ -217,19 +221,19 @@ with DAG(
 
     # Fetch and upload crypto data task
     fetch_and_upload_data_gcs_task = PythonOperator(
-        task_id = 'fetch_crypto_data',
+        task_id = 'fetch_and_upload_data_gcs_task',
         python_callable = fetch_and_upload_crypto_data,
     )
 
     # Load data to BigQuery task
     load_data_bq_task = PythonOperator(
-        task_id = 'load_to_bigquery',
+        task_id = 'load_data_bq_task',
         python_callable = load_data_to_bigquery,
     )
 
     # Trigger BigQuery procedure task
     trigger_procedure_task = PythonOperator(
-        task_id = 'trigger_bigquery_procedure',
+        task_id = 'trigger_procedure_task',
         python_callable = trigger_bigquery_procedure,
     )
 
