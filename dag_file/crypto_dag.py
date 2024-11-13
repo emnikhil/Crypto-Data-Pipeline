@@ -19,6 +19,7 @@ def fetch_and_upload_crypto_data():
 
     # Get current date for filename
     current_date = datetime.now().strftime("%Y-%m-%d")
+    current_date_filename = datetime.now().strftime("%Y%m%d")
     
     # List of coins you want to fetch
     coins = ['bitcoin', 'ethereum', 'tether', 'binancecoin', 'solana']
@@ -90,7 +91,7 @@ def fetch_and_upload_crypto_data():
         # Convert all collected data to a DataFrame
         df = pd.DataFrame(all_data)  # Use DataFrame directly from the cleaned list
         
-        local_file_path = f'/tmp/crypto_data_{current_date}.csv'
+        local_file_path = f'/tmp/crypto_data_{current_date_filename}.csv'
         
         # Save the DataFrame as a csv file
         df.to_csv(local_file_path, index=False)
@@ -98,7 +99,7 @@ def fetch_and_upload_crypto_data():
         # Initialize GCS client and upload the file
         client = storage.Client()
         bucket = client.get_bucket('initial_layer')
-        blob = bucket.blob(f'crypto_data/{current_date}/crypto_data_{current_date}.csv')
+        blob = bucket.blob(f'crypto_data/{current_date}/crypto_data_{current_date_filename}.csv')
         blob.upload_from_filename(local_file_path)
         
         print("Data uploaded to GCS successfully.")
@@ -122,7 +123,7 @@ def load_data_to_bigquery():
         source_format = bigquery.SourceFormat.CSV,
         skip_leading_rows = 1,
         autodetect = True,  # Automatically detects the schema
-        write_disposition = bigquery.WriteDisposition.WRITE_APPEND,  # Append data to the existing table
+        write_disposition = bigquery.WriteDisposition.WRITE_TRUNCATE,  # Overwrite data for the same partition
         create_disposition = bigquery.CreateDisposition.CREATE_IF_NEEDED,  # Create the table if it doesn't exist
         schema_update_options = ['ALLOW_FIELD_ADDITION'],  # Allow new fields to be added to the schema
         time_partitioning = bigquery.table.TimePartitioning(
@@ -209,8 +210,8 @@ default_args = {
 with DAG(
     'crypto_data_pipeline',
     default_args = default_args,
-    description = 'A DAG to fetch crypto data, store on GCS, and process in Databricks',
-    schedule_interval = '0 3 * * *'  # Run daily at 3:30 AM UTC / 9:00 AM IST
+    description = 'A DAG to fetch crypto data, store on GCS, and process on BigQuery',
+    schedule_interval = '30 4 * * *'  # Run at 4:30 AM UTC / 10:00 AM IST
 ) as dag:
 
     # Start task to print timestamp
