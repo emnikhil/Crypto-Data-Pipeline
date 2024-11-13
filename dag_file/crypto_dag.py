@@ -43,10 +43,9 @@ def fetch_and_upload_crypto_data():
             # Check if the response contains the data for the coin
             data = response.json()
 
-            # Ensure the coin data exists in the response (some coins might not be available)
+            # Ensure the coin data exists in the response
             if coin in data:
                 coin_data = data[coin]
-                coin_data['coin'] = coin  # Add the coin name as a column
 
                 # Flatten the nested data without appending the coin name to the column
                 flattened_data = {
@@ -69,15 +68,15 @@ def fetch_and_upload_crypto_data():
                 }
                 
                 all_data.append(flattened_data)  # Append the cleaned data for this coin
-                print(f"Data for {coin} appended to DataFrame.")
+                print(f"Data for {coin_data['coin']} appended to DataFrame.")
             else:
-                print(f"Data for {coin} not found in the response.")
+                print(f"Data for {coin_data['coin']} not found in the response.")
         
         except requests.exceptions.RequestException as e:
-            print(f"Error fetching data for {coin}: {e}")
+            print(f"Error fetching data for {coin_data['coin']}: {e}")
 
         except Exception as e:
-            print(f"Error processing {coin}: {e}")
+            print(f"Error processing {coin_data['coin']}: {e}")
         
         # Wait for 30 seconds before making the next request
         time.sleep(30)
@@ -114,7 +113,7 @@ def load_data_to_bigquery():
 
     client = bigquery.Client()
 
-    # Define your BigQuery table ID
+    # Define BigQuery table ID
     table_id = 'crypto-data-analysis-441505.initial_data.crypto_data_temp'
 
     # Set up job configuration to append data and create table if needed
@@ -127,7 +126,7 @@ def load_data_to_bigquery():
         schema_update_options = ['ALLOW_FIELD_ADDITION']  # Allow new fields to be added to the schema
     )
 
-    # Define the URI for your source CSV files
+    # Define the URI for source CSV files
     # Get current date
     current_date = datetime.now().strftime("%Y-%m-%d")
     uri = f'gs://initial_layer/crypto_data/{current_date}/crypto_data_*.csv'
@@ -160,9 +159,9 @@ def load_data_to_bigquery():
 
 # Function to trigger BigQuery procedure
 def trigger_bigquery_procedure():
+
     client = bigquery.Client()
 
-    # Specify the SQL procedure to execute
     query = "CALL `crypto-data-analysis-441505.initial_data.sp_crypto_analysis`();"
     
     try:
@@ -204,9 +203,10 @@ default_args = {
 # DAG definition
 with DAG(
     'crypto_data_pipeline',
-    default_args=default_args,
-    description='A DAG to fetch crypto data, store on GCS, and process in Databricks',
-    schedule_interval='@daily',
+    default_args = default_args,
+    description = 'A DAG to fetch crypto data, store on GCS, and process in Databricks',
+    schedule_interval = '0 3 * * *',  # Run daily at 3:30 AM UTC / 9:00 AM IST
+    timezone = 'Asia/Kolkata'  # Optional: specify the timezone as IST
 ) as dag:
 
     # Start task to print timestamp
@@ -216,21 +216,21 @@ with DAG(
     )
 
     # Fetch and upload crypto data task
-    fetch_and_upload_data_task = PythonOperator(
+    fetch_and_upload_data_gcs_task = PythonOperator(
         task_id = 'fetch_crypto_data',
         python_callable = fetch_and_upload_crypto_data,
     )
 
     # Load data to BigQuery task
-    load_data_task = PythonOperator(
-        task_id='load_to_bigquery',
-        python_callable=load_data_to_bigquery,
+    load_data_bq_task = PythonOperator(
+        task_id = 'load_to_bigquery',
+        python_callable = load_data_to_bigquery,
     )
 
     # Trigger BigQuery procedure task
     trigger_procedure_task = PythonOperator(
-        task_id='trigger_bigquery_procedure',
-        python_callable=trigger_bigquery_procedure,
+        task_id = 'trigger_bigquery_procedure',
+        python_callable = trigger_bigquery_procedure,
     )
 
     # End task to print timestamp
@@ -240,4 +240,4 @@ with DAG(
     )
 
     # Task dependencies
-    start >> fetch_and_upload_data_task >> load_data_task  >> trigger_procedure_task >> end
+    start >> fetch_and_upload_data_gcs_task >> load_data_bq_task  >> trigger_procedure_task >> end
