@@ -1,43 +1,87 @@
-# Crypto Data Pipeline
-
-## Project Overview
+# Crypto Data Pipeline with Airflow and Google Cloud
 
 This project implements an end-to-end data pipeline that extracts cryptocurrency data from a public API, processes it, and stores the data in Google BigQuery for analysis. The pipeline is orchestrated using Apache Airflow (via Google Cloud Composer) to run daily, ensuring that the most recent data is available for visualization and reporting.
 
 ![Data Pipeline Diagram](/images/crypto.png)
+---
 
-## Technologies Used
+## Data Processing Pipeline Overview
 
-- **Google Cloud Platform (GCP)**
-  - **Google Cloud Storage (GCS)**: Used for storing raw cryptocurrency data extracted from the API. The data is organized in folders by date.
-  - **Google BigQuery**: Used for storing processed data and running procedures for analysis.
-  - **Cloud Composer (Apache Airflow)**: Used for orchestrating and scheduling the entire data pipeline, ensuring data is processed and updated daily.
+The data pipeline involves multiple stages:
 
-- **Google Looker**: Used to visualize and analyze the data stored in BigQuery by creating interactive dashboards, reports, and charts.
-- **GitHub**: Used for version control to manage project code and documentation.
+1. **Fetching Crypto Data:**
+   - The pipeline fetches real-time cryptocurrency data from external APIs, specifically focusing on 5 selected cryptocurrencies: **'bitcoin', 'ethereum', 'tether', 'binancecoin', 'solana'**.
+   - This data is retrieved in CSV format from the [CoinGecko API](https://api.coingecko.com/api/v3/simple/price) and uploaded to a Google Cloud Storage bucket for storage.
 
-## Pipeline Steps
+2. **Data Transformation:**
+   - The fetched data undergoes transformation and is prepared for loading into Google BigQuery.
+   - The transformation process includes cleaning, reformatting, and filtering unnecessary data to make it suitable for analysis.
 
-1. **Data Extraction**:
-   - **Trigger Airflow DAG**: A Directed Acyclic Graph (DAG) is triggered in Airflow to start the data extraction process.
-   - **API Call**: The DAG makes an API call to retrieve the latest cryptocurrency data for specified coins (e.g., Bitcoin, Ethereum).
-   - **Store Raw Data**: The raw data is stored in Google Cloud Storage (GCS) in CSV format, with each file saved in a date-stamped folder (e.g., `crypto_data/YYYY-MM-DD/crypto_data_<timestamp>.csv`).
+3. **Loading Data to BigQuery:**
+   - Once the data is cleaned and transformed, it is loaded into a **BigQuery table**.
+   - The data is partitioned by date, and the `date` column in the data is used for partitioning.
+   - Data is loaded into a table in BigQuery, where each row represents a cryptocurrency's market data at a given time.
 
-2. **Data Load to BigQuery**:
-   - **BigQuery Load**: After a brief waiting period, a BigQuery load job is triggered to append the CSV data from GCS into an existing BigQuery table. The table structure remains consistent, with only new data appended daily.
-   - **Procedure Execution**: After the data is loaded, a BigQuery stored procedure is executed to perform any necessary transformations and calculations, generating output in a final BigQuery table ready for visualization.
+4. **Triggering BigQuery Stored Procedure:**
+   - After loading data into BigQuery, a stored procedure is triggered in BigQuery for further data analysis. This stored procedure can be used for performing aggregations, generating insights, or running advanced analytics on the loaded data.
 
-3. **Data Visualization**:
-   - **Google Looker**: Connect Looker to the final BigQuery table to create visualizations and dashboards displaying cryptocurrency trends and metrics.
-   - **Report Creation**: Use Looker’s tools to build interactive, customizable reports for stakeholders or further analysis, with options to define custom metrics and alerts as needed.
+---
 
-4. **Scheduling and Monitoring**:
-   - **Daily Runs**: The Airflow DAG is configured to run daily, ensuring that the pipeline continually ingests the latest cryptocurrency data.
-   - **Monitoring**: Set up alerts and logs in Airflow to monitor the pipeline’s execution and ensure data accuracy.
+## Apache Airflow for Orchestrating the Pipeline
 
-## Getting Started
+Airflow is used to orchestrate the entire pipeline, allowing you to define, schedule, and monitor each step of the data processing workflow. The pipeline is built with **PythonOperators** in Airflow, and the following steps are executed in sequence:
 
-### Prerequisites
+### Tasks in the Airflow DAG
 
-- A Google Cloud Platform account
-- Git installed on your local machine
+1. **Start Task (`start`):**
+   - This task logs the start timestamp for the pipeline execution.
+
+2. **Fetch Crypto Data Task (`fetch_and_upload_data_gcs_task`):**
+   - This task calls the function to fetch cryptocurrency data and uploads it to Google Cloud Storage.
+
+3. **Load Data to BigQuery Task (`load_data_bq_task`):**
+   - This task loads the cleaned data from Google Cloud Storage to Google BigQuery.
+
+4. **Trigger BigQuery Procedure Task (`trigger_procedure_task`):**
+   - This task triggers the BigQuery procedure after data is loaded, allowing for further analysis.
+
+5. **End Task (`end`):**
+   - This task logs the end timestamp, marking the completion of the pipeline.
+
+### Airflow Graph
+
+![Airflow Graph](/images/airflow-graph.png)
+
+![Airflow Task Log](/images/airflow-log.png)
+
+---
+
+## Google Cloud Storage
+
+Google Cloud Storage (GCS) is used as a staging area for storing the fetched cryptocurrency data before it is loaded into BigQuery. GCS allows for easy storage and access of large datasets, making it an ideal choice for this pipeline.
+
+The pipeline fetches cryptocurrency data in real-time and stores it in a GCS bucket. From there, it is processed and loaded into BigQuery.
+
+![Google Cloud Storage](/images/gcs.png)
+
+---
+
+## BigQuery Data Sample
+
+Here’s a snapshot of the data loaded into Google BigQuery after running the pipeline:
+
+![BigQuery Data Sample](/images/bigquery-data-sample.png)
+
+This image shows how the data looks in the BigQuery table after it is loaded by the pipeline.
+
+---
+
+## Setup and Configuration
+
+### Set up Google Cloud
+
+Before starting, ensure you have set up the following on your Google Cloud account:
+
+- A **GCS bucket** for storing cryptocurrency data.
+- A **BigQuery dataset** and table for loading and analyzing data.
+- Ensure the necessary IAM roles and permissions are granted for interacting with GCS and BigQuery.
