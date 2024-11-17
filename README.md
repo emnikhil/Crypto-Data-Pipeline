@@ -76,6 +76,21 @@ This image shows how the data looks in the BigQuery table after it is loaded by 
 
 ---
 
+## Database Schema
+
+![Database Diagram](/images/database-diagram.png)
+
+The database consists of the following tables:
+
+- **`crypto_data_temp`**: Stores raw cryptocurrency data for each coin in USD, INR, and EUR.
+- **`final_data`**: Stores processed data with details for each cryptocurrency in different currencies.
+- **`market_metrics`**: Stores total market cap data for each currency.
+- **`volume_metrics`**: Stores 24-hour trading volume for each currency.
+
+These tables are linked by the cryptocurrency `coin` and partitioned by `date` to enable efficient querying and data analysis.
+
+---
+
 ## Setup and Configuration
 
 ### Set up Google Cloud
