@@ -123,10 +123,9 @@ def load_data_to_bigquery():
         source_format = bigquery.SourceFormat.CSV,
         skip_leading_rows = 1,
         autodetect = True,  # Automatically detects the schema
-        write_disposition = bigquery.WriteDisposition.WRITE_TRUNCATE,  # Overwrite data for the same partition
+        write_disposition = bigquery.WriteDisposition.WRITE_APPEND,
         create_disposition = bigquery.CreateDisposition.CREATE_IF_NEEDED,  # Create the table if it doesn't exist
-        schema_update_options = ['ALLOW_FIELD_ADDITION'],  # Allow new fields to be added to the schema
-        time_partitioning = bigquery.table.TimePartitioning(
+        time_partitioning = bigquery.TimePartitioning(
             field = "date",  # Partition Column Name
             type_ = bigquery.TimePartitioningType.DAY  # Partition by day
         )
