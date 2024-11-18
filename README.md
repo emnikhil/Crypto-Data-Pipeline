@@ -3,6 +3,7 @@
 This project implements an end-to-end data pipeline that extracts cryptocurrency data from a public API, processes it, and stores the data in Google BigQuery for analysis. The pipeline is orchestrated using Apache Airflow (via Google Cloud Composer) to run daily, ensuring that the most recent data is available for visualization and reporting.
 
 ![Data Pipeline Diagram](/images/crypto.png)
+
 ---
 
 ## Data Processing Pipeline Overview
@@ -72,8 +73,6 @@ Here’s a snapshot of the data loaded into Google BigQuery after running the pi
 
 ![BigQuery Data Sample](/images/bigquery-data-sample.png)
 
-This image shows how the data looks in the BigQuery table after it is loaded by the pipeline.
-
 ---
 
 ## Database Schema
@@ -88,6 +87,25 @@ The database consists of the following tables:
 - **`volume_metrics`**: Stores 24-hour trading volume for each currency.
 
 These tables are linked by the cryptocurrency `coin` and partitioned by `date` to enable efficient querying and data analysis.
+
+---
+
+## Data Visualization with Looker
+
+Looker is used to visualize and analyze the processed cryptocurrency data. With its interactive dashboards and powerful query-building capabilities, Looker enables detailed insights into the performance and trends of selected cryptocurrencies.
+
+### Key Visualizations
+
+1. **Overall Market Trends:**
+   - A dashboard showcasing real-time market cap, 24-hour volume, and price changes for the 5 cryptocurrencies.
+
+2. **Performance Comparison:**
+   - A comparative analysis of price changes and market trends for **'bitcoin', 'ethereum', 'tether', 'binancecoin', and 'solana'**.
+
+![Looker Visualization 1](/images/looker1.png)
+![Looker Visualization 2](/images/looker2.png)
+
+With these visualizations, users can easily track cryptocurrency performance over time and make informed decisions based on up-to-date market data.
 
 ---
 
